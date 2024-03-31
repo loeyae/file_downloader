@@ -1,24 +1,3 @@
-# excel_downloader
-
-## Project setup
-```
-yarn install
-```
-
-### Compiles and hot-reloads for development
-```
-yarn serve
-```
-
-### Compiles and minifies for production
-```
-yarn build
-```
-
-### Lints and fixes files
-```
-yarn lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+# 文件批量下载
+excel中第一列为文件名，第二列为文件url
+选中excel后将以10个并发批量下载文件到安装目录的download文件夹
