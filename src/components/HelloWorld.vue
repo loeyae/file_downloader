@@ -1,40 +1,120 @@
 <template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <p>
-      For a guide and recipes on how to configure / customize this project,<br>
-      check out the
-      <a href="https://cli.vuejs.org" target="_blank" rel="noopener">vue-cli documentation</a>.
-    </p>
-    <h3>Installed CLI Plugins</h3>
-    <ul>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-babel" target="_blank" rel="noopener">babel</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-eslint" target="_blank" rel="noopener">eslint</a></li>
-    </ul>
-    <h3>Essential Links</h3>
-    <ul>
-      <li><a href="https://vuejs.org" target="_blank" rel="noopener">Core Docs</a></li>
-      <li><a href="https://forum.vuejs.org" target="_blank" rel="noopener">Forum</a></li>
-      <li><a href="https://chat.vuejs.org" target="_blank" rel="noopener">Community Chat</a></li>
-      <li><a href="https://twitter.com/vuejs" target="_blank" rel="noopener">Twitter</a></li>
-      <li><a href="https://news.vuejs.org" target="_blank" rel="noopener">News</a></li>
-    </ul>
-    <h3>Ecosystem</h3>
-    <ul>
-      <li><a href="https://router.vuejs.org" target="_blank" rel="noopener">vue-router</a></li>
-      <li><a href="https://vuex.vuejs.org" target="_blank" rel="noopener">vuex</a></li>
-      <li><a href="https://github.com/vuejs/vue-devtools#vue-devtools" target="_blank" rel="noopener">vue-devtools</a></li>
-      <li><a href="https://vue-loader.vuejs.org" target="_blank" rel="noopener">vue-loader</a></li>
-      <li><a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">awesome-vue</a></li>
-    </ul>
+  <div>
+    <el-container>
+      <el-header>请选择excel文件</el-header>
+      <el-main>
+        <el-row>
+          <el-col :span="24">
+            <el-button size="small" @click="selectExcel" type="primary">选择excel文件</el-button>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="24">
+            <el-table :data="excelData" style="width: 100%">
+              <el-table-column prop="id" label="编号" width="80">
+              </el-table-column>
+              <el-table-column prop="name" label="名称" width="180">
+              </el-table-column>
+              <el-table-column prop="url" label="链接">
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="80">
+                <template slot-scope="scope">
+                  <el-tag v-if="scope.row.status === 0" type="info">未开始</el-tag>
+                  <el-tag v-else-if="scope.row.status === 1" type="">下载中</el-tag>
+                  <el-tag v-else-if="scope.row.status === 2" type="success">下载完成</el-tag>
+                  <el-tag v-else type="danger">下载失败</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="path" label="下载后地址"></el-table-column>
+            </el-table>
+          </el-col>
+        </el-row>
+      </el-main>
+    </el-container>
   </div>
 </template>
 
 <script>
+const nodeXlsx = window.require('node-xlsx')
+const REQ = window.require('request')
+const fs = window.require('fs')
+const path = window.require('path')
 export default {
   name: 'HelloWorld',
   props: {
     msg: String
+  },
+  data() {
+    return {
+      tableHeader: [],
+      outputPath: './download',
+      excelData: [],
+      downloadQueue:[],
+    }
+  },
+  methods: {
+    selectExcel() {
+      window.ipcRenderer.send('open-excel-dialog', 'excel');
+      window.ipcRenderer.on('selected-excel', (event, filePath) => {
+        console.log('进来了 导入文件 event=', event)
+        let sheets = nodeXlsx.parse(filePath)
+        let id = 1;
+        sheets.forEach(sheet => {
+          let row = sheet.data
+          for (let i = 0; i < row.length; i++) {
+            let item = row[i]
+            if (item.length > 1) {
+              this.excelData.push({id: id, name: item[0], url: item[1], status: 0})
+              if (this.downloadQueue.length < 10) {
+                this.download({id: id, name: item[0], url: item[1], status: 0})
+              }
+            }
+            id++
+          }
+        })
+      })
+    },
+    download(data) {
+      const that = this
+      let url = data.url
+      let type = url.slice(url.lastIndexOf('.')+1)
+      let filePath = path.join(this.outputPath, data.name+"."+type)
+      var req = REQ({method: "GET", url: encodeURI(url)})
+      if (!fs.existsSync(this.outputPath)) {
+        fs.mkdirSync(this.outputPath, '0777', {recursive: true})
+      }
+      var out = fs.createWriteStream(filePath)
+      req.pipe(out)
+      req.on('response', function (res) {
+        console.log('downloading', res)
+        let index = that.excelData.findIndex(item => item.id === data.id)
+        that.excelData[index].status = 1
+        data.status = 1
+        that.downloadQueue.push(data)
+      })
+      req.on('error', function (err) {
+        console.log('download error', err)
+        let index = that.excelData.findIndex(item => item.id === data.id)
+        that.excelData[index].status = 3
+      })
+      req.on('end', function () {
+        console.log('downloaded')
+        let downloadIndex = that.downloadQueue.findIndex(item => item.id === data.id)
+        that.downloadQueue.splice(downloadIndex, 1)
+        let index = that.excelData.findIndex(item => item.id === data.id)
+        that.excelData[index].status = 2
+        that.excelData[index].path = filePath
+        while (that.downloadQueue.length < 10) {
+          let downloadDataIndex = that.excelData.findIndex(item => item.status === 0)
+          let downloadData = that.excelData[downloadDataIndex]
+          if (downloadData) {
+            that.download(downloadData)
+          } else {
+            return
+          }
+        }
+      })
+    }
   }
 }
 </script>
