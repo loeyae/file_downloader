@@ -68,13 +68,24 @@ export default {
             let item = row[i]
             if (item.length > 1) {
               this.excelData.push({id: id, name: item[0], url: item[1], status: 0, received: 0})
-              if (this.downloadQueue.length < 10) {
-                this.download({id: id, name: item[0], url: item[1], status: 0})
-              }
             }
             id++
           }
         })
+        this.pauseForSeconds(10000)
+        for (let i = 0; i < 10; i++) {
+          let item = this.excelData[i]
+          if (!item) {
+            return;
+          }
+          this.download(item)
+          this.pauseForSeconds(1000)
+        }
+      })
+    },
+    pauseForSeconds(ms) {
+      return new Promise(resolve => {
+        setTimeout(resolve, ms)
       })
     },
     download(data) {
