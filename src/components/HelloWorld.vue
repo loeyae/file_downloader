@@ -56,6 +56,9 @@ export default {
     selectExcel() {
       window.ipcRenderer.send('open-excel-dialog', 'excel');
       window.ipcRenderer.on('selected-excel', (event, filePath) => {
+        if (!filePath) {
+          return
+        }
         console.log('进来了 导入文件 event=', event)
         let sheets = nodeXlsx.parse(filePath)
         let id = 1;
@@ -64,7 +67,7 @@ export default {
           for (let i = 0; i < row.length; i++) {
             let item = row[i]
             if (item.length > 1) {
-              this.excelData.push({id: id, name: item[0], url: item[1], status: 0})
+              this.excelData.push({id: id, name: item[0], url: item[1], status: 0, received: 0})
               if (this.downloadQueue.length < 10) {
                 this.download({id: id, name: item[0], url: item[1], status: 0})
               }
@@ -79,18 +82,30 @@ export default {
       let url = data.url
       let type = url.slice(url.lastIndexOf('.')+1)
       let filePath = path.join(this.outputPath, data.name+"."+type)
-      var req = REQ({method: "GET", url: encodeURI(url)})
+      let params = {method: "GET", url: encodeURI(url)}
+      let index = that.excelData.findIndex(item => item.id === data.id)
+      if (this.excelData[index].received > 0) {
+        params.headers = {
+          Range: 'bytes=' + this.excelData[index].received
+        }
+      }
+      var req = REQ(params)
       if (!fs.existsSync(this.outputPath)) {
         fs.mkdirSync(this.outputPath, '0777', {recursive: true})
       }
       var out = fs.createWriteStream(filePath)
       req.pipe(out)
       req.on('response', function (res) {
-        console.log('downloading', res)
+        console.log('downloading', url, res)
         let index = that.excelData.findIndex(item => item.id === data.id)
         that.excelData[index].status = 1
         data.status = 1
         that.downloadQueue.push(data)
+      })
+      req.on('data', function (chunk) {
+        console.log('downloading',url, chunk.length)
+        let index = that.excelData.findIndex(item => item.id === data.id)
+        that.excelData[index].received += chunk.length
       })
       req.on('error', function (err) {
         console.log('download error', err)
@@ -98,7 +113,7 @@ export default {
         that.excelData[index].status = 3
       })
       req.on('end', function () {
-        console.log('downloaded')
+        console.log('downloaded', url)
         let downloadIndex = that.downloadQueue.findIndex(item => item.id === data.id)
         that.downloadQueue.splice(downloadIndex, 1)
         let index = that.excelData.findIndex(item => item.id === data.id)

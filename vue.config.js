@@ -22,15 +22,8 @@ module.exports = defineConfig({
         },
       },
       externals: [
-          "core-js",
-          "element-ui",
           "node-xlsx",
-          "request",
-          "sqlite3",
-          "vue",
-          "vuex",
-          "vue-router",
-          "vuex-router-sync"
+          "request"
       ]
     }
   }
