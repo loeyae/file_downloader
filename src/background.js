@@ -1,15 +1,30 @@
 'use strict'
 
-import { app, protocol, BrowserWindow, ipcMain, dialog} from 'electron'
+import { app, protocol, BrowserWindow} from 'electron'
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer'
+import { IpcMainEvent } from './ipcMainEvent'
+import log from 'electron-log'
 import path from 'path'
+import logger from "electron-log";
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { secure: true, standard: true } }
 ])
+
+log.transports.file.level = "info"
+log.transports.file.maxSize = 10 * 1024 * 1024
+if (!isDevelopment) {
+  logger.transports.console.level = false
+}
+log.transports.file.resolvePath = () => {
+  if (isDevelopment) {
+    return path.join(path.dirname(__dirname), 'main.log')
+  }
+  return 'main.log'
+}
 
 async function createWindow() {
   // Create the browser window.
@@ -21,20 +36,9 @@ async function createWindow() {
       // Use pluginOptions.nodeIntegration, leave this alone
       // See nklayman.github.io/vue-cli-plugin-electron-builder/guide/security.html#node-integration for more info
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      enableRemoteModule: true
     }
-  })
-
-  ipcMain.on('open-excel-dialog', (event) => {
-    dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }]
-    }).then(result => {
-      if (result) {
-        console.log(result)
-        event.sender.send('selected-excel', result.filePaths[0])
-      }
-    })
   })
 
   if (process.env.WEBPACK_DEV_SERVER_URL) {
@@ -46,6 +50,9 @@ async function createWindow() {
     // Load the index.html when not in development
     win.loadURL('app://./index.html')
   }
+
+  IpcMainEvent(win, log)
+  log.info("test test")
 }
 
 
