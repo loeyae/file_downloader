@@ -1,7 +1,7 @@
 import Vue from 'vue'
-import App from './App.vue'
 import ElementUI from 'element-ui'
 import './styles.scss'
+import App from './App.vue'
 
 import router from './router'
 import path from "path";
@@ -19,9 +19,9 @@ if (process.env.NODE_ENV === 'production') {
 }
 logger.transports.file.resolvePath = () => {
   if (process.env.NODE_ENV !== 'production') {
-    return path.join(path.dirname('D:\\work\\src\\project\\excel_downloader\\src'), 'render.log')
+    return path.join(path.dirname('E:\\Work\\src\\loeyae\\excel_downloader\\src'), 'render.log')
   }
-  return 'render.log'
+  return path.join(path.dirname(window.$remote.app.getPath('exe')),'render.log')
 }
 Vue.prototype.$logger = logger
 

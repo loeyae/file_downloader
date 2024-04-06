@@ -29,8 +29,8 @@ log.transports.file.resolvePath = () => {
 async function createWindow() {
   // Create the browser window.
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1280,
+    height: 800,
     webPreferences: {
 
       // Use pluginOptions.nodeIntegration, leave this alone
@@ -52,7 +52,7 @@ async function createWindow() {
   }
 
   IpcMainEvent(win, log)
-  log.info("test test")
+  log.info("init window")
 }
 
 
@@ -71,6 +71,13 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
 })
 
+app.whenReady().then(() => {
+  protocol.registerFileProtocol('atom', (request, callback) => {
+    const pathname = path.normalize(decodeURIComponent(request.url.replace('atom://', '')));
+    callback(pathname)
+  })
+})
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -80,7 +87,7 @@ app.on('ready', async () => {
     try {
       await installExtension(VUEJS_DEVTOOLS)
     } catch (e) {
-      console.error('Vue Devtools failed to install:', e.toString())
+      logger.error('Vue Devtools failed to install:', e.toString())
     }
   }
   createWindow()
